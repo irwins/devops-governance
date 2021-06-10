@@ -54,6 +54,10 @@ module "ado_standard_permissions" {
   ado_project_id = azuredevops_project.team_projects["proj_${each.value.team}"].id
   team_aad_id    = azuread_group.groups["${each.value.team}_devs"].id
   admin_aad_id   = azuread_group.groups["${each.value.team}_admins"].id
+
+  depends_on = [
+    azuread_group.groups
+  ]
 }
 
 # Supermarket Project
@@ -79,6 +83,10 @@ module "supermarket_permissions_fruits" {
   ado_project_id = azuredevops_project.supermarket.id
   team_aad_id    = azuread_group.groups["fruits_devs"].id
   admin_aad_id   = azuread_group.groups["fruits_admins"].id
+
+  depends_on = [
+    azuread_group.groups
+  ]
 }
 
 module "supermarket_permissions_veggies" {
@@ -86,6 +94,10 @@ module "supermarket_permissions_veggies" {
   ado_project_id = azuredevops_project.supermarket.id
   team_aad_id    = azuread_group.groups["veggies_devs"].id
   admin_aad_id   = azuread_group.groups["veggies_admins"].id
+
+  depends_on = [
+    azuread_group.groups
+  ]
 }
 
 # Shared Collaboration
@@ -110,6 +122,10 @@ module "collaboration_permissions_fruits" {
   ado_project_id = azuredevops_project.collaboration.id
   team_aad_id    = azuread_group.groups["fruits_devs"].id
   admin_aad_id   = azuread_group.groups["fruits_admins"].id
+
+  depends_on = [
+    azuread_group.groups
+  ]
 }
 
 module "collaboration_permissions_veggies" {
@@ -117,19 +133,27 @@ module "collaboration_permissions_veggies" {
   ado_project_id = azuredevops_project.collaboration.id
   team_aad_id    = azuread_group.groups["veggies_devs"].id
   admin_aad_id   = azuread_group.groups["veggies_admins"].id
+
+  depends_on = [
+    azuread_group.groups
+  ]
 }
 
 
 # Workspaces
 # ----------
 
-module "workspace" {
+module "arm_environments" {
   for_each             = var.environments
   source               = "./modules/azure-resources"
   name                 = "${each.value.team}-${each.value.env}-${local.suffix}"
   team_group_id        = azuread_group.groups["${each.value.team}_devs"].id
   admin_group_id       = azuread_group.groups["${each.value.team}_admins"].id
   superadmins_group_id = local.superadmins_aad_object_id
+
+  depends_on = [
+    azuread_group.groups
+  ]
 }
 
 
@@ -137,7 +161,7 @@ module "workspace" {
 # ---------------------------
 
 module "service_connections" {
-  for_each             = module.workspace
+  for_each             = module.arm_environments # implicit dependency?
   source               = "./modules/azure-devops-service-connection"
   service_principal_id = each.value.service_principals[0].application_id
   key_vault_name       = each.value.key_vault

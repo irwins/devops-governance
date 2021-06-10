@@ -1,5 +1,5 @@
-output "workspaces" {
-  value = module.workspace[*]
+output "arm_environments" {
+  value = module.arm_environments[*]
 }
 
 output "aad_groups" {
