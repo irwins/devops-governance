@@ -42,7 +42,7 @@ module "service_principals" {
 }
 
 # --------------------------------
-# ARM Workspaces (Resource Groups)
+# Resource Groups ("Workspaces")
 # --------------------------------
 
 module "arm_environments" {
@@ -55,126 +55,149 @@ module "arm_environments" {
   service_principal_id = module.service_principals["${each.value.team}_${each.value.env}"].principal_id
 }
 
-
+# ------------
 # Azure DevOps
 # ------------
 
-# resource "azuredevops_project" "team_projects" {
-#   for_each        = var.projects
-#   name            = each.value.name
-#   description     = each.value.description
-#   visibility      = "private"
-#   version_control = "Git"
+# The following section Bootstraps:
+# - Projects: Team silos and shared projects
+# - Security Group Assignments: like Role Assignments in ARM
+# - Service Connections: service principal credentials created in code above
 
-#   features = {
-#     repositories = "enabled"
-#     pipelines    = "enabled"
-#     artifacts    = "disabled"
-#     boards       = "disabled"
-#     testplans    = "disabled"
-#   }
-# }
+# Projects
+# --------
 
-# module "ado_standard_permissions" {
-#   for_each       = var.projects
-#   source         = "./modules/azure-devops-permissions"
-#   ado_project_id = azuredevops_project.team_projects["proj_${each.value.team}"].id
-#   team_aad_id    = azuread_group.groups["${each.value.team}_devs"].id
-#   admin_aad_id   = azuread_group.groups["${each.value.team}_admins"].id
+# Team Projects
 
-#   depends_on = [
-#     azuread_group.groups
-#   ]
-# }
+resource "azuredevops_project" "team_projects" {
+  for_each        = var.projects
+  name            = each.value.name
+  description     = each.value.description
+  visibility      = "private"
+  version_control = "Git"
 
-# # Supermarket Project
+  features = {
+    repositories = "enabled"
+    pipelines    = "enabled"
+    artifacts    = "disabled"
+    boards       = "disabled"
+    testplans    = "disabled"
+  }
+}
 
-# resource "azuredevops_project" "supermarket" {
-#   name            = "supermarket"
-#   description     = "Example: 1 project, many teams, many repos"
-#   visibility      = "private"
-#   version_control = "Git"
+# Supermarket Project
 
-#   features = {
-#     boards       = "enabled"
-#     repositories = "enabled"
-#     pipelines    = "enabled"
-#     artifacts    = "disabled"
-#     testplans    = "disabled"
-#   }
-# }
+resource "azuredevops_project" "supermarket" {
+  name            = "supermarket"
+  description     = "Example: 1 project, many teams, many repos"
+  visibility      = "private"
+  version_control = "Git"
 
+  features = {
+    boards       = "enabled"
+    repositories = "enabled"
+    pipelines    = "enabled"
+    artifacts    = "disabled"
+    testplans    = "disabled"
+  }
+}
+
+# Shared Collaboration Project (Only Azure Boards)
+
+resource "azuredevops_project" "collaboration" {
+  name            = "shared-collaboration"
+  description     = "Example: what if separate teams should talk to each other? (Disadvantage: cannot link external project commits to work items in this project)"
+  visibility      = "private"
+  version_control = "Git"
+
+  features = {
+    boards       = "enabled"
+    repositories = "disabled"
+    pipelines    = "disabled"
+    artifacts    = "disabled"
+    testplans    = "disabled"
+  }
+}
+
+# Security Group Assignments
+# --------------------------
+
+# Teams Silo Projects -  Security Group Assignments
+
+module "team_permissions" {
+  for_each       = var.projects
+  source         = "./modules/azure-devops-permissions"
+  ado_project_id = azuredevops_project.team_projects["proj_${each.value.team}"].id
+  team_aad_id    = azuread_group.groups["${each.value.team}_devs"].id     # Receives 'Contributor' Permissions
+  admin_aad_id   = azuread_group.groups["${each.value.team}_admins"].id   # Receives 'Project Administrator' Permissions
+
+  depends_on = [
+    azuread_group.groups
+  ]
+}
+
+# Supermarket Project - Security Group Assignments
 # TODO: supermarket collab model with devs, admins and all
-# module "supermarket_permissions_fruits" {
-#   source         = "./modules/azure-devops-permissions"
-#   ado_project_id = azuredevops_project.supermarket.id
-#   team_aad_id    = azuread_group.groups["fruits_devs"].id
-#   admin_aad_id   = azuread_group.groups["fruits_admins"].id
 
-#   depends_on = [
-#     azuread_group.groups
-#   ]
-# }
+module "supermarket_permissions_fruits" {
+  source         = "./modules/azure-devops-permissions"
+  ado_project_id = azuredevops_project.supermarket.id
+  team_aad_id    = azuread_group.groups["fruits_devs"].id
+  admin_aad_id   = azuread_group.groups["fruits_admins"].id
 
-# module "supermarket_permissions_veggies" {
-#   source         = "./modules/azure-devops-permissions"
-#   ado_project_id = azuredevops_project.supermarket.id
-#   team_aad_id    = azuread_group.groups["veggies_devs"].id
-#   admin_aad_id   = azuread_group.groups["veggies_admins"].id
+  depends_on = [
+    azuread_group.groups
+  ]
+}
 
-#   depends_on = [
-#     azuread_group.groups
-#   ]
-# }
+module "supermarket_permissions_veggies" {
+  source         = "./modules/azure-devops-permissions"
+  ado_project_id = azuredevops_project.supermarket.id
+  team_aad_id    = azuread_group.groups["veggies_devs"].id
+  admin_aad_id   = azuread_group.groups["veggies_admins"].id
 
-# Shared Collaboration
+  depends_on = [
+    azuread_group.groups
+  ]
+}
 
-# resource "azuredevops_project" "collaboration" {
-#   name            = "shared-collaboration"
-#   description     = "Example: what if separate teams should talk to each other? (Disadvantage: cannot link external project commits to work items in this project)"
-#   visibility      = "private"
-#   version_control = "Git"
+# Collaboration Project - Security Group Assignments
 
-#   features = {
-#     boards       = "enabled"
-#     repositories = "disabled"
-#     pipelines    = "disabled"
-#     artifacts    = "disabled"
-#     testplans    = "disabled"
-#   }
-# }
+module "collaboration_permissions_fruits" {
+  source         = "./modules/azure-devops-permissions"
+  ado_project_id = azuredevops_project.collaboration.id
+  team_aad_id    = azuread_group.groups["fruits_devs"].id
+  admin_aad_id   = azuread_group.groups["fruits_admins"].id
 
-# module "collaboration_permissions_fruits" {
-#   source         = "./modules/azure-devops-permissions"
-#   ado_project_id = azuredevops_project.collaboration.id
-#   team_aad_id    = azuread_group.groups["fruits_devs"].id
-#   admin_aad_id   = azuread_group.groups["fruits_admins"].id
+  depends_on = [
+    azuread_group.groups
+  ]
+}
 
-#   depends_on = [
-#     azuread_group.groups
-#   ]
-# }
+module "collaboration_permissions_veggies" {
+  source         = "./modules/azure-devops-permissions"
+  ado_project_id = azuredevops_project.collaboration.id
+  team_aad_id    = azuread_group.groups["veggies_devs"].id
+  admin_aad_id   = azuread_group.groups["veggies_admins"].id
 
-# module "collaboration_permissions_veggies" {
-#   source         = "./modules/azure-devops-permissions"
-#   ado_project_id = azuredevops_project.collaboration.id
-#   team_aad_id    = azuread_group.groups["veggies_devs"].id
-#   admin_aad_id   = azuread_group.groups["veggies_admins"].id
+  depends_on = [
+    azuread_group.groups
+  ]
+}
 
-#   depends_on = [
-#     azuread_group.groups
-#   ]
-# }
-
-
-
-# Service Connections for ADO
-# ---------------------------
+# Service Connections
+# -------------------
 
 # module "service_connections" {
-#   for_each             = module.arm_environments # implicit dependency?
+#   for_each             = module.arm_environments
 #   source               = "./modules/azure-devops-service-connection"
-#   service_principal_id = each.value.service_principals[0].application_id
-#   key_vault_name       = each.value.key_vault
+#   service_principal_id = each.value.service_principals[0].application_id # Does this work???
+#   key_vault_name       = each.value.key_vault # not needed
 #   resource_group_name  = each.value.resource_group_name
+
+#   depends_on = [
+#     azuread_group.groups,
+#     module.arm_environments,
+#     module.service_principals
+#   ]
 # }
