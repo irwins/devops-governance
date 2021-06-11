@@ -1,7 +1,8 @@
 # Service Principal
 # ------------------
+# See https://docs.microsoft.com/en-us/azure/active-directory/develop/app-objects-and-service-principals
 
-resource "random_password" "sp_password" {
+resource "random_password" "secret" {
   length           = 30
   special          = true
   min_numeric      = 5
@@ -15,7 +16,7 @@ resource "azuread_application" "app" {
 
 resource "azuread_application_password" "workspace_sp_secret" {
   application_object_id = azuread_application.app.object_id
-  value                 = random_password.sp_password.result
+  value                 = random_password.secret.result
   end_date_relative     = var.password_lifetime
 }
 

@@ -1,9 +1,10 @@
 data "azurerm_client_config" "current" {}
 
-# Suffix
 # ------
-# Some Azure resources, e.g. storage accounts must have globally
-# unique names. Use a suffix to avoid automation errors.
+# Config
+# ------
+
+# Suffix - for globally unique resource names
 
 resource "random_string" "suffix" {
   length  = 4
@@ -18,7 +19,7 @@ locals {
   superadmins_aad_object_id = var.superadmins_aad_object_id == "" ? data.azurerm_client_config.current.object_id : var.superadmins_aad_object_id
 }
 
-# --------------
+# ---------------
 # Azure AD Groups
 # ---------------
 
@@ -28,9 +29,21 @@ resource "azuread_group" "groups" {
   prevent_duplicate_names = true
 }
 
-# --------------
-# ARM Workspaces
-# --------------
+# ------------------
+# Service Principals
+# ------------------
+
+# TODO: document use for CI only. Apps should use diff. SP per PILP
+
+module "service_principals" {
+  for_each = var.environments
+  source   = "./modules/service-principal"
+  name     = "${each.value.team}-${each.value.env}-${local.suffix}-ci-sp"
+}
+
+# --------------------------------
+# ARM Workspaces (Resource Groups)
+# --------------------------------
 
 module "arm_environments" {
   for_each             = var.environments
@@ -39,10 +52,7 @@ module "arm_environments" {
   devs_group_id        = azuread_group.groups["${each.value.team}_devs"].id
   admins_group_id      = azuread_group.groups["${each.value.team}_admins"].id
   superadmins_group_id = local.superadmins_aad_object_id
-
-  depends_on = [
-    azuread_group.groups
-  ]
+  service_principal_id = module.service_principals["${each.value.team}_${each.value.env}"].principal_id
 }
 
 

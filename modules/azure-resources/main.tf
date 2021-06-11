@@ -39,51 +39,74 @@ resource "azurerm_key_vault" "kv" {
   enable_rbac_authorization   = true
 }
 
-resource "azurerm_role_assignment" "superadmins_kv_admins" {
-  role_definition_name = "Key Vault Administrator" # note: takes up to 10 minutes to propagate
-  principal_id         = var.superadmins_group_id
-  scope                = azurerm_key_vault.kv.id
-}
+# # ------------------
+# # Service Principals
+# # ------------------
 
-# ------------------
-# Service Principals
-# ------------------
-
-module "workspace_sp" {
-  source = "./../service-principal"
-  name   = "${local.name}-sp"
-}
+# module "workspace_sp" {
+#   source = "./../service-principal"
+#   name   = "${local.name}-sp"
+# }
 
 # -----------------------
 # RBAC - Role Assignments
 # -----------------------
 
-resource "azurerm_role_assignment" "team_admins" {
+# Resource Group - Team Admins
+
+resource "azurerm_role_assignment" "rg_team_admins" {
   role_definition_name = "Owner"
   principal_id         = var.admins_group_id
   scope                = azurerm_resource_group.workspace.id
 }
 
-# Key Vault Admin
-# ---------------
+# Resource Group - Team Devs
 
-# superadmins_group_id
-
-# Contributors
-# ------------
-
-# Service Principal
-
-# resource "azurerm_role_assignment" "workspace_sp" {
-#   role_definition_name = "Contributor"
-#   principal_id         = azuread_service_principal.workspace_sp.id
-#   scope                = azurerm_resource_group.workspace.id
-# }
-
-# AAD Group
-
-resource "azurerm_role_assignment" "team_devs" {
+resource "azurerm_role_assignment" "rg_team_devs" {
   role_definition_name = "Contributor"
   principal_id         = var.devs_group_id
   scope                = azurerm_resource_group.workspace.id
 }
+
+# Resource Group - Service Principal
+
+resource "azurerm_role_assignment" "rg_sp" {
+  role_definition_name = "Contributor"
+  principal_id         = var.service_principal_id
+  scope                = azurerm_resource_group.workspace.id
+}
+
+# Key Vault - Superadmins (i.e. organization - top level admins)
+
+resource "azurerm_role_assignment" "kv_superadmins" {
+  role_definition_name = "Key Vault Administrator" # note: takes up to 10 minutes to propagate
+  principal_id         = var.superadmins_group_id
+  scope                = azurerm_key_vault.kv.id
+}
+
+# Key Vault - Team Admins
+
+resource "azurerm_role_assignment" "kv_team_admins" {
+  role_definition_name = "Key Vault Administrator" # note: takes up to 10 minutes to propagate
+  principal_id         = var.admins_group_id
+  scope                = azurerm_key_vault.kv.id
+}
+
+# Key Vault - Devs
+
+resource "azurerm_role_assignment" "kv_team_devs" {
+  role_definition_name = "Key Vault Secrets User" # note: takes up to 10 minutes to propagate
+  principal_id         = var.devs_group_id
+  scope                = azurerm_key_vault.kv.id
+}
+
+# # Key Vault - Service Principal (team should create own sps/rbac per app)
+
+# resource "azurerm_role_assignment" "kv_workspace_sp" {
+#   role_definition_name = "Key Vault Secrets User" # note: takes up to 10 minutes to propagate
+#   principal_id         = var.devs_group_id
+#   scope                = azurerm_key_vault.kv.id
+# }
+
+# Why does it take up to 10 minutes for Key Vault RBAC to propagate?
+# See https://docs.microsoft.com/en-us/azure/key-vault/general/rbac-guide?tabs=azure-cli#known-limits-and-performance

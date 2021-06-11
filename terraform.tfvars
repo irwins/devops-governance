@@ -48,27 +48,27 @@ projects = {
 # e.g. module.workspace["shared"]. Suffixes are appended later.
 
 environments = {
-  fru_dev = {
+  fruits_dev = {
     env  = "dev"
     team = "fruits"
   }
 
-  fru_prod = {
+  fruits_prod = {
     env  = "prod"
     team = "fruits"
   }
 
-  veg_dev = {
+  veggies_dev = {
     env  = "dev"
     team = "veggies"
   }
 
-  veg_prod = {
+  veggies_prod = {
     env  = "prod"
     team = "veggies"
   }
 
-  shared = {
+  infra_shared = {
     env  = "shared"
     team = "infra"
   }
