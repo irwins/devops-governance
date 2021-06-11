@@ -6,6 +6,10 @@ output "aad_app" {
   }
 }
 
+output "display_name" {
+	value = azuread_application.app.display_name
+}
+
 output "principal_id" {
 	value = azuread_service_principal.sp.id
 }
