@@ -1,4 +1,5 @@
-# RESOURCE GROUP
+# --------------
+# Resource Group
 # --------------
 
 resource "azurerm_resource_group" "workspace" {
@@ -7,7 +8,8 @@ resource "azurerm_resource_group" "workspace" {
   tags     = var.tags
 }
 
-# STORAGE ACCOUNT
+# ---------------
+# Storage Account
 # ---------------
 
 resource "azurerm_storage_account" "storage" {
@@ -20,7 +22,8 @@ resource "azurerm_storage_account" "storage" {
   tags                     = var.tags
 }
 
-# AZURE KEY VAULT
+# ---------------
+# Azure Key Vault
 # ---------------
 
 resource "azurerm_key_vault" "kv" {
@@ -33,102 +36,54 @@ resource "azurerm_key_vault" "kv" {
   purge_protection_enabled    = false # so we can fully delete it
   sku_name                    = "standard"
   tags                        = var.tags
+  enable_rbac_authorization   = true
 }
 
-# Key Vault Access Policy - superadmins
-# e.g. admins as well has limited infrastructure service principals
-
-resource "azurerm_key_vault_access_policy" "superadmins" {
-  key_vault_id = azurerm_key_vault.kv.id
-  object_id    = var.superadmins_group_id
-  tenant_id    = local.client_tenant_id
-
-  secret_permissions = [
-    "backup",
-    "delete",
-    "get",
-    "list",
-    "purge",
-    "recover",
-    "restore",
-    "set"
-  ]
-
-  storage_permissions = [
-    "backup",
-    "delete",
-    "deletesas",
-    "get",
-    "getsas",
-    "list",
-    "listsas",
-    "purge",
-    "recover",
-    "regeneratekey",
-    "restore",
-    "set",
-    "setsas",
-    "update"
-  ]
+resource "azurerm_role_assignment" "superadmins_kv_admins" {
+  role_definition_name = "Key Vault Administrator" # note: takes up to 10 minutes to propagate
+  principal_id         = var.superadmins_group_id
+  scope                = azurerm_key_vault.kv.id
 }
 
-# Key Vault Access Policy - workspace service principal
+# ------------------
+# Service Principals
+# ------------------
 
-data "azuread_service_principal" "workspace_sp" {
-  application_id = azuread_application.workspace_sp.application_id # "${var.sp_id}"
+module "workspace_sp" {
+  source = "./../service-principal"
+  name   = "${local.name}-sp"
 }
 
-resource "azurerm_key_vault_access_policy" "workspace_sp" {
-  key_vault_id = azurerm_key_vault.kv.id
-  object_id    = data.azuread_service_principal.workspace_sp.id
-  tenant_id    = local.client_tenant_id
+# -----------------------
+# RBAC - Role Assignments
+# -----------------------
 
-  secret_permissions = [
-    "backup",
-    "delete",
-    "get",
-    "list",
-    "purge",
-    "recover",
-    "restore",
-    "set"
-  ]
+resource "azurerm_role_assignment" "team_admins" {
+  role_definition_name = "Owner"
+  principal_id         = var.admins_group_id
+  scope                = azurerm_resource_group.workspace.id
 }
 
-# Key Vault Access Policy - Read-only e.g. for Azure DevOps
+# Key Vault Admin
+# ---------------
 
-data "azuread_service_principal" "kv_reader_sp" {
-  application_id = azuread_application.kv_reader_sp.application_id # "${var.sp_id}"
-}
+# superadmins_group_id
 
-resource "azurerm_key_vault_access_policy" "kv_reader" {
-  key_vault_id = azurerm_key_vault.kv.id
-  object_id    = data.azuread_service_principal.kv_reader_sp.id
-  tenant_id    = local.client_tenant_id
+# Contributors
+# ------------
 
-  key_permissions = [
-    "get",
-  ]
+# Service Principal
 
-  secret_permissions = [
-    "get",
-  ]
-}
+# resource "azurerm_role_assignment" "workspace_sp" {
+#   role_definition_name = "Contributor"
+#   principal_id         = azuread_service_principal.workspace_sp.id
+#   scope                = azurerm_resource_group.workspace.id
+# }
 
-# KEY VAULT SECRETS
-# -----------------
-# Examples and our service principal credentials
+# AAD Group
 
-resource "azurerm_key_vault_secret" "workspace_sp_secret" {
-  name         = "workspace-sp-secret"
-  value        = random_password.workspace_sp.result
-  key_vault_id = azurerm_key_vault.kv.id
-  tags         = var.tags
-}
-
-resource "azurerm_key_vault_secret" "kv_reader_sp_secret" {
-  name         = "kv-reader-sp-secret"
-  value        = random_password.kv_reader_sp.result
-  key_vault_id = azurerm_key_vault.kv.id
-  tags         = var.tags
+resource "azurerm_role_assignment" "team_devs" {
+  role_definition_name = "Contributor"
+  principal_id         = var.devs_group_id
+  scope                = azurerm_resource_group.workspace.id
 }

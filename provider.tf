@@ -1,7 +1,7 @@
 terraform {
   # Store Terraform Stage in Azure Storage Account (see backend.hcl.sample)
-  backend "azurerm" {
-  }
+  # backend "azurerm" {
+  # }
 
   required_providers {
     azuread = {
